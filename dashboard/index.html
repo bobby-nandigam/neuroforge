@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEUROFORGE X — Compiler Studio</title>
+    <script src="https://cdn.tailwindcss.com/3.4.13"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              graphite: { 900: "#0b0d10", 800: "#12151a", 700: "#1a1f27", 600: "#232a34" },
+              cyan: { DEFAULT: "#22d3ee" },
+              violet: { DEFAULT: "#a78bfa" },
+            },
+            fontFamily: {
+              mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background: #0b0d10; }
+      .rf-node { font-family: ui-monospace, Menlo, monospace; }
+    </style>
+  </head>
+  <body class="text-slate-200 font-mono">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

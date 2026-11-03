@@ -1,0 +1,26 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Artifacts & local runtime state
+/artifacts/*
+/captures/*
+!artifacts/.gitkeep
+!captures/.gitkeep
+.neuroforge/

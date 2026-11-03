@@ -1,0 +1,96 @@
+# NEUROFORGE X — benchmark workload
+# A wide fan-out designed to exercise both the parallel scheduler (6 independent
+# segmentation+feature branches at the same dependency level) and the optimizer's
+# common-subexpression elimination (dupA/dupB are identical to seg1 and collapse).
+name: benchmark-fanout
+
+inputs:
+  - name: video
+    type: video
+    ref: examples/benchmark/clip.mp4
+
+operations:
+  - id: frames
+    type: vision.frame_extract
+    backend: local
+    params: { fps: 1 }
+    inputs: { video: $video }
+
+  # Six distinct segmentations (different params => not merged) — parallelizable.
+  - id: seg1
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 1 }
+    inputs: { image: frames.frames }
+  - id: seg2
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 2 }
+    inputs: { image: frames.frames }
+  - id: seg3
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 3 }
+    inputs: { image: frames.frames }
+  - id: seg4
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 4 }
+    inputs: { image: frames.frames }
+  - id: seg5
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 5 }
+    inputs: { image: frames.frames }
+  - id: seg6
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 6 }
+    inputs: { image: frames.frames }
+
+  # Two duplicates of seg1 (identical params) — eliminated by CSE.
+  - id: segDupA
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 1 }
+    inputs: { image: frames.frames }
+  - id: segDupB
+    type: vision.segmentation
+    backend: meta.sam
+    params: { region: 1 }
+    inputs: { image: frames.frames }
+
+  - id: feat1
+    type: vision.features
+    backend: local
+    inputs: { objects: seg1.objects }
+  - id: feat2
+    type: vision.features
+    backend: local
+    inputs: { objects: seg2.objects }
+  - id: feat3
+    type: vision.features
+    backend: local
+    inputs: { objects: seg3.objects }
+  - id: feat4
+    type: vision.features
+    backend: local
+    inputs: { objects: seg4.objects }
+  - id: feat5
+    type: vision.features
+    backend: local
+    inputs: { objects: seg5.objects }
+  - id: feat6
+    type: vision.features
+    backend: local
+    inputs: { objects: seg6.objects }
+  - id: featDupA
+    type: vision.features
+    backend: local
+    inputs: { objects: segDupA.objects }
+  - id: featDupB
+    type: vision.features
+    backend: local
+    inputs: { objects: segDupB.objects }
+
+outputs: [feat1, feat2, feat3, feat4, feat5, feat6, featDupA, featDupB]

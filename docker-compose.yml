@@ -1,0 +1,27 @@
+# NEUROFORGE X — control plane + dashboard for local development.
+services:
+  control-plane:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Optional: set these to use the real Meta Model API instead of the mock.
+      META_API_KEY: ${META_API_KEY:-}
+      META_API_BASE_URL: ${META_API_BASE_URL:-https://api.meta.ai/v1}
+      MUSE_SPARK_MODEL: ${MUSE_SPARK_MODEL:-muse-spark}
+      SAM_API_PATH: ${SAM_API_PATH:-}
+      MUSE_IMAGE_API_PATH: ${MUSE_IMAGE_API_PATH:-}
+
+  dashboard:
+    image: node:22
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite dev proxy points /api at the control plane service.
+      VITE_API_TARGET: http://control-plane:8080
+    depends_on:
+      - control-plane

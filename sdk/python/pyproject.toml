@@ -1,0 +1,16 @@
+[project]
+name = "neuroforge"
+version = "0.1.0"
+description = "Python SDK for the NEUROFORGE X multimodal AI compiler & runtime"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []  # standard library only
+license = { text = "MIT" }
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["neuroforge*"]
