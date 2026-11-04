@@ -1,0 +1,65 @@
+# NEUROFORGE X — Cognitive Video Intelligence Pipeline (fully local variant)
+#
+# This workload runs with NO cloud credentials. Cognition (planning and
+# reasoning) runs on Meta's own Llama model locally via Ollama (backend
+# local.llama). Frame/feature/report operators run in-process on the local
+# backend. Only segmentation uses the mock, because SAM needs a GPU/torch
+# runtime that is not available here — its output is clearly labeled simulated.
+#
+# Prerequisites for real local cognition:
+#   ollama serve
+#   ollama pull llama3.2:3b     # or set OLLAMA_MODEL to another Llama tag
+#
+# If Ollama is offline, local.llama automatically falls back to the labeled
+# mock, so the pipeline still compiles and runs.
+name: warehouse-local
+
+inputs:
+  - name: video
+    type: video
+    ref: examples/warehouse-intelligence/warehouse.mp4
+  - name: instruction
+    type: text
+    ref: "Analyze this warehouse video, identify objects, understand the scene, and generate a structured inspection report."
+
+operations:
+  # Compiler frontend: local Llama turns the instruction into a structured plan.
+  - id: plan
+    type: cognition.plan
+    backend: local.llama
+    inputs: { instruction: $instruction }
+
+  # Local operator: frame sampling metadata.
+  - id: frames
+    type: vision.frame_extract
+    backend: local
+    params: { fps: 1 }
+    inputs: { video: $video }
+
+  # Visual perception: SAM would run here. Local stand-in (labeled simulated)
+  # because torch/GPU segmentation is not available on this machine.
+  - id: segment
+    type: vision.segmentation
+    backend: mock
+    inputs: { image: frames.frames }
+
+  # Local operator: measured spatial features (observations, not inferences).
+  - id: features
+    type: vision.features
+    backend: local
+    inputs: { objects: segment.objects }
+
+  # Cognition: local Llama interprets the measured observations.
+  - id: reason
+    type: cognition.reasoning
+    backend: local.llama
+    inputs: { observations: features.features }
+
+  # Local operator: assemble the final structured report.
+  - id: report
+    type: output.structured
+    backend: local
+    params: { title: "Warehouse inspection report (local)" }
+    inputs: { data: reason.result }
+
+outputs: [plan, report]

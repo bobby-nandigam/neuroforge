@@ -7,12 +7,14 @@ package setup
 
 import (
 	"neuroforge/backends"
+	"neuroforge/backends/llama"
 	"neuroforge/backends/local"
 	"neuroforge/backends/meta/client"
 	"neuroforge/backends/meta/muse_image"
 	"neuroforge/backends/meta/muse_spark"
 	"neuroforge/backends/meta/sam"
 	"neuroforge/backends/mock"
+	"neuroforge/backends/vision"
 )
 
 // Env bundles the assembled runtime environment.
@@ -29,6 +31,12 @@ func Default() *Env {
 	reg := backends.NewRegistry()
 	reg.Register(mk)
 	reg.Register(local.New())
+	// Fully local cognition on Meta's own Llama via Ollama (no credentials);
+	// falls back to the labeled mock when Ollama is not running / model unpulled.
+	reg.Register(backends.NewFallback("local.llama", llama.New(), mk))
+	// Fully local visual perception on Meta's own Llama 3.2 Vision via Ollama,
+	// analyzing real frames; falls back to the labeled mock when unavailable.
+	reg.Register(backends.NewFallback("local.vision", vision.New(), mk))
 	// Meta adapters, each with a mock fallback under the same name.
 	reg.Register(backends.NewFallback("meta.muse_spark", muse_spark.New(gw), mk))
 	reg.Register(backends.NewFallback("meta.sam", sam.New(gw), mk))

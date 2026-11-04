@@ -86,7 +86,7 @@ func init() {
 		Summary:       "Interpret a natural-language instruction into a structured execution plan (Muse Spark).",
 		Inputs:        []Port{{Name: "instruction", Type: TypeText}},
 		Outputs:       []Port{{Name: "plan", Type: TypeJSON}},
-		Backends:      []string{"meta.muse_spark", "mock"},
+		Backends:      []string{"local.llama", "meta.muse_spark", "mock"},
 		Deterministic: false,
 		Cacheable:     false,
 	})
@@ -95,7 +95,7 @@ func init() {
 		Summary:       "Reason over observations and produce a structured interpretation (Muse Spark).",
 		Inputs:        []Port{{Name: "observations", Type: TypeJSON}},
 		Outputs:       []Port{{Name: "result", Type: TypeJSON}},
-		Backends:      []string{"meta.muse_spark", "mock"},
+		Backends:      []string{"local.llama", "meta.muse_spark", "mock"},
 		Deterministic: false,
 		Cacheable:     false,
 	})
@@ -104,7 +104,7 @@ func init() {
 		Summary:       "Segment an image into objects with masks and boxes (SAM 3.1).",
 		Inputs:        []Port{{Name: "image", Type: TypeImage}},
 		Outputs:       []Port{{Name: "objects", Type: TypeObjectList}, {Name: "mask", Type: TypeMask}},
-		Backends:      []string{"meta.sam", "mock"},
+		Backends:      []string{"meta.sam", "local.vision", "mock"},
 		Deterministic: true,
 		Cacheable:     true,
 	})

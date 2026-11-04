@@ -6,9 +6,14 @@ package local
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 
 	"neuroforge/backends"
@@ -57,7 +62,7 @@ func (b *Backend) Execute(ctx context.Context, op *ir.Operation, inputs map[stri
 	}
 	switch op.Type {
 	case "vision.frame_extract":
-		return b.frameExtract(op, inputs)
+		return b.frameExtract(ctx, op, inputs)
 	case "vision.features":
 		return b.features(op, inputs)
 	case "output.structured":
@@ -67,20 +72,94 @@ func (b *Backend) Execute(ctx context.Context, op *ir.Operation, inputs map[stri
 	}
 }
 
-// frameExtract reports frame-sampling metadata for a video input. Real frame
-// decoding (via OpenCV) is delegated to the Python vision service; here we
-// produce deterministic sampling metadata the downstream graph can type-check.
-func (b *Backend) frameExtract(op *ir.Operation, inputs map[string]backends.Value) (map[string]backends.Value, error) {
+// frameExtract decodes real frames from a video input using ffmpeg when a
+// readable video file is present at the input ref, returning the on-disk frame
+// paths plus a representative key frame (the middle one) for downstream vision.
+// When no decodable file exists (e.g. only a placeholder ref), it degrades to
+// deterministic sampling metadata so the graph still type-checks and runs —
+// clearly labeled so a metadata-only run is never mistaken for real decoding.
+func (b *Backend) frameExtract(ctx context.Context, op *ir.Operation, inputs map[string]backends.Value) (map[string]backends.Value, error) {
 	v := inputs["video"]
 	fps := intParam(op.Params, "fps", 1)
+	videoPath := v.Ref
+	if videoPath == "" {
+		if s, ok := v.Data.(string); ok {
+			videoPath = s
+		}
+	}
+
+	if videoPath != "" {
+		if st, err := os.Stat(videoPath); err == nil && !st.IsDir() {
+			if _, ffErr := exec.LookPath("ffmpeg"); ffErr == nil {
+				frames, dir, err := extractFrames(ctx, videoPath, fps)
+				if err != nil {
+					return nil, fmt.Errorf("local: ffmpeg frame extraction failed: %w", err)
+				}
+				if len(frames) > 0 {
+					key := frames[len(frames)/2] // representative middle frame
+					return map[string]backends.Value{
+						"frames": {
+							Type: ir.TypeImage,
+							Ref:  key,
+							Data: map[string]any{
+								"source":         videoPath,
+								"dir":            dir,
+								"sample_fps":     fps,
+								"frame_count":    len(frames),
+								"frames":         frames,
+								"representative": key,
+								"note":           "real frames decoded from the video via ffmpeg",
+							},
+							Meta: map[string]any{"backend": "local", "measured": true, "decoded": true},
+						},
+					}, nil
+				}
+			}
+		}
+	}
+
+	// Fallback: no decodable video file at the ref.
 	return map[string]backends.Value{
 		"frames": {
 			Type: ir.TypeImage,
 			Ref:  v.Ref,
-			Data: map[string]any{"source": v.Ref, "sample_fps": fps, "note": "frame sampling metadata (decode delegated to vision service)"},
-			Meta: map[string]any{"backend": "local", "measured": true},
+			Data: map[string]any{"source": v.Ref, "sample_fps": fps, "note": "no decodable video file at ref; provide a real file to decode frames"},
+			Meta: map[string]any{"backend": "local", "measured": true, "decoded": false},
 		},
 	}, nil
+}
+
+// extractFrames samples frames from videoPath at the given fps into a stable,
+// content-addressed directory under ./captures, reusing an existing extraction
+// when present. It caps the number of frames so a long clip stays bounded.
+func extractFrames(ctx context.Context, videoPath string, fps int) ([]string, string, error) {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s|fps=%d|v2", videoPath, fps)))
+	dir := filepath.Join("captures", hex.EncodeToString(sum[:])[:12])
+	if existing := listFrames(dir); len(existing) > 0 {
+		return existing, dir, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, dir, err
+	}
+	pattern := filepath.Join(dir, "frame_%03d.jpg")
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-hide_banner", "-loglevel", "error",
+		"-i", videoPath,
+		"-vf", fmt.Sprintf("fps=%d", fps),
+		"-frames:v", "24", // bound the extraction
+		"-q:v", "3",
+		pattern,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, dir, fmt.Errorf("%v: %s", err, string(out))
+	}
+	return listFrames(dir), dir, nil
+}
+
+func listFrames(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, "frame_*.jpg"))
+	sort.Strings(matches)
+	return matches
 }
 
 type detection struct {

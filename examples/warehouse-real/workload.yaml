@@ -1,0 +1,67 @@
+# NEUROFORGE X — Cognitive Video Intelligence Pipeline (real video, fully local)
+#
+# End to end on real pixels, with NO cloud credentials:
+#   1. vision.frame_extract (local)  decodes real frames from the video via ffmpeg
+#   2. vision.segmentation  (local.vision) runs Meta's Llama 3.2 Vision on a real
+#      frame and returns the objects it actually observes
+#   3. vision.features      (local)  computes measured spatial statistics
+#   4. cognition.reasoning  (local.llama) interprets the observations on local Llama
+#   5. output.structured    (local)  assembles the final report
+#
+# Prerequisites:
+#   ollama serve
+#   ollama pull llama3.2-vision      # visual perception (Meta's multimodal model)
+#   ollama pull llama3.2:3b          # reasoning (or set OLLAMA_MODEL)
+#   ffmpeg on PATH
+#
+# Set the video ref below to a real file. If any local model is offline the
+# runtime falls back to the labeled mock for that step, so the graph still runs.
+name: warehouse-real
+
+inputs:
+  - name: video
+    type: video
+    # Point this at a real clip, e.g. examples/warehouse-real/warehouse.mp4
+    ref: examples/warehouse-real/warehouse.mp4
+  - name: instruction
+    type: text
+    ref: "Analyze this video, identify the objects actually present, and generate a structured inspection report."
+
+operations:
+  - id: plan
+    type: cognition.plan
+    backend: local.llama
+    inputs: { instruction: $instruction }
+
+  # Real frame extraction from the video (ffmpeg).
+  - id: frames
+    type: vision.frame_extract
+    backend: local
+    params: { fps: 1 }
+    inputs: { video: $video }
+
+  # Real visual perception: Meta's Llama 3.2 Vision reads an actual frame.
+  - id: segment
+    type: vision.segmentation
+    backend: local.vision
+    inputs: { image: frames.frames }
+
+  # Measured spatial features over the detected objects.
+  - id: features
+    type: vision.features
+    backend: local
+    inputs: { objects: segment.objects }
+
+  # Reasoning over the measured observations (local Llama).
+  - id: reason
+    type: cognition.reasoning
+    backend: local.llama
+    inputs: { observations: features.features }
+
+  - id: report
+    type: output.structured
+    backend: local
+    params: { title: "Warehouse inspection report (real video, local)" }
+    inputs: { data: reason.result }
+
+outputs: [plan, report]

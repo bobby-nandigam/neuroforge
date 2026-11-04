@@ -60,7 +60,8 @@ func renderMetrics(m executor.Metrics, simulated bool) {
 	fmt.Println(rule())
 	fmt.Printf("execution metrics  (concurrency=%d)\n", m.Concurrency)
 	if simulated {
-		fmt.Println("note: backend latencies are SIMULATED by the mock (no Meta credentials set)")
+		fmt.Println("note: one or more nodes ran on the mock — those latencies are SIMULATED;")
+		fmt.Println("      local and configured model backends (e.g. local.llama) are measured.")
 	}
 	fmt.Println(rule())
 	p := m.Profile

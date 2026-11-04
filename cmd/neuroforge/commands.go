@@ -148,10 +148,15 @@ func cmdRun(args []string) error {
 
 	env := setup.Default()
 	ex := executor.New(env.Registry)
-	simulated := !env.Gateway.Configured()
 
 	ctx := context.Background()
 	res := ex.Run(ctx, c.Optimized, nil, cfg)
+
+	// A run's latencies are simulated only if some node actually ran on the
+	// mock — either routed there directly or because its real backend was
+	// unconfigured and fell back. Nodes on local / configured local.llama /
+	// configured Meta backends have genuine measured latencies.
+	simulated := anySimulatedNode(env, res.Metrics)
 
 	rec := RunRecord{
 		ID:        newExecID(),
@@ -189,6 +194,21 @@ func cmdRun(args []string) error {
 	renderMetrics(res.Metrics, simulated)
 	fmt.Printf("\nsaved: neuroforge profile %s\n", rec.ID)
 	return res.Err
+}
+
+// anySimulatedNode reports whether any executed node's latency came from the
+// mock backend (either routed to "mock" directly, or a Fallback backend whose
+// real implementation was unconfigured and fell back to the mock).
+func anySimulatedNode(env *setup.Env, m executor.Metrics) bool {
+	for _, n := range m.Profile.Nodes {
+		if n.Backend == "mock" {
+			return true
+		}
+		if b, ok := env.Registry.Get(n.Backend); ok && !b.Configured() {
+			return true
+		}
+	}
+	return false
 }
 
 func cmdProfile(args []string) error {
